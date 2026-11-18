@@ -69,7 +69,22 @@ model Agency {
   name      String
   users     User[]
   clients   Client[]
+  holidays  AgencyHoliday[]
   createdAt DateTime @default(now())
+}
+
+model AgencyHoliday {
+  id          String   @id @default(cuid())
+  agencyId    String
+  title       String
+  date        DateTime
+  description String?
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([agencyId, date])
+  @@map("agency_holidays")
 }
 
 model Client {
@@ -86,6 +101,7 @@ model Client {
   users      User[]
   contents   Content[]
   shoots     Shoot[]
+  marketingActivities MarketingActivity[]
   memberships ClientMember[]
   calendars Calendar[]
   templates Template[]
@@ -136,6 +152,26 @@ model Shoot {
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@index([clientId, date])
+}
+
+model MarketingActivity {
+  id             String   @id @default(cuid())
+  clientId       String
+  creativeName   String
+  platform       String   @default("META")
+  uploadedAt     DateTime
+  spendRupees    Decimal  @default(0) @db.Decimal(12, 2)
+  takenDownAt    DateTime?
+  imageUrl       String?
+  imagePublicId  String?
+  notes          String?
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([clientId, uploadedAt])
+  @@index([takenDownAt])
+  @@map("marketing_activities")
 }
 
 model Approval {
