@@ -24,10 +24,10 @@ DATABASE_URL="postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true&c
 DIRECT_URL="postgresql://...@db.<project-ref>.supabase.co:5432/postgres?sslmode=require"
 JWT_SECRET="a-long-random-secret-generated-for-this-deployment"
 PORT=4000
-WEB_ORIGIN="http://localhost:3000"
+WEB_ORIGIN="http://localhost:3000,https://content-calendar-frontend-six.vercel.app"
 ```
 
-Use the exact connection strings Supabase displays; URL-encode special characters in passwords. Keep `.env` and all credentials out of version control. The frontend must never receive either database URL or a Supabase service-role key. `WEB_ORIGIN` should be the deployed frontend origin in production.
+Use the exact connection strings Supabase displays; URL-encode special characters in passwords. Keep `.env` and all credentials out of version control. The frontend must never receive either database URL or a Supabase service-role key. `WEB_ORIGIN` accepts a comma-separated list of browser origins. The deployed frontend origin is allowed by default; include localhost for local development.
 
 ## 4. Install and migrate
 
@@ -56,9 +56,8 @@ Public calendar sharing is served by the NestJS API and returns only approved or
 
 ## 7. Deploy the backend
 
-Deploy `apps/api` as a Node.js service. Configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `PORT`, and `WEB_ORIGIN` as server-side environment variables. Build with `npm ci && npx prisma generate && npm run build`. Run `npx prisma migrate deploy` as a release step before starting the new API version. Run `npx prisma db seed` only when demo data is intentionally wanted. Use HTTPS, rotate secrets through the hosting provider, and restrict production database access to the backend environment.
+Deploy `apps/api` as a Node.js service. Configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `PORT`, and `WEB_ORIGIN` as server-side environment variables. Set the frontend's public API base URL to the deployed backend origin plus `/api`; localhost URLs only work for a browser on the developer's machine. Build with `npm ci && npx prisma generate && npm run build`. Run `npx prisma migrate deploy` as a release step before starting the new API version. Run `npx prisma db seed` only when demo data is intentionally wanted. Use HTTPS, rotate secrets through the hosting provider, and restrict production database access to the backend environment.
 
 ## Schema
 
 The Prisma schema includes `users`, `clients`, `client_members`, `calendars`, `content_items`, `templates`, `color_palettes`, and `calendar_shares`, plus the agency, approvals, refresh-token, and legacy content records used by existing API routes. Calendar design and presentation configuration use PostgreSQL `JSONB`.
-
