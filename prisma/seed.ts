@@ -1,8 +1,12 @@
 import { PrismaClient, Role, Platform, ContentType, ContentStatus } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import { hashPassword } from '../src/password';
 const prisma = new PrismaClient();
 async function main() {
-  const hash = await bcrypt.hash('ChangeMe123!', 12);
+  const demoPassword = process.env.DEMO_ADMIN_PASSWORD;
+  if (!demoPassword || demoPassword.length < 12) {
+    throw new Error('Set DEMO_ADMIN_PASSWORD to a value of at least 12 characters before seeding demo data.');
+  }
+  const hash = await hashPassword(demoPassword);
   const agency = await prisma.agency.upsert({where:{id:'demo-agency'},update:{},create:{id:'demo-agency',name:'Studio North'}});
   const admin = await prisma.user.upsert({where:{email:'admin@contentflow.local'},update:{},create:{name:'Agency Admin',email:'admin@contentflow.local',passwordHash:hash,role:Role.ADMIN,agencyId:agency.id}});
   const clients = [

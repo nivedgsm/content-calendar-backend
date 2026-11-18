@@ -22,12 +22,12 @@ Copy `.env.example` to `.env` in `apps/api` and replace placeholders with your p
 ```dotenv
 DATABASE_URL="postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
 DIRECT_URL="postgresql://...@db.<project-ref>.supabase.co:5432/postgres?sslmode=require"
-JWT_SECRET="a-long-random-secret-generated-for-this-deployment"
+JWT_ACCESS_SECRET="a-long-random-secret-generated-for-this-deployment"
 PORT=4000
 WEB_ORIGIN="http://localhost:3000,https://content-calendar-frontend-six.vercel.app"
 ```
 
-Use the exact connection strings Supabase displays; URL-encode special characters in passwords. Keep `.env` and all credentials out of version control. The frontend must never receive either database URL or a Supabase service-role key. `WEB_ORIGIN` accepts a comma-separated list of browser origins. The deployed frontend origin is allowed by default; include localhost for local development.
+Use the exact connection strings Supabase displays; URL-encode special characters in passwords. Keep `.env` and all credentials out of version control. The frontend must never receive either database URL or a Supabase service-role key. `JWT_ACCESS_SECRET` must be a random value of at least 32 bytes. `WEB_ORIGIN` accepts a comma-separated list of browser origins. The deployed frontend origin is allowed by default; include localhost for local development.
 
 ## 4. Install and migrate
 
@@ -42,11 +42,11 @@ npx prisma db seed
 
 `DIRECT_URL` is used by Prisma Migrate while `DATABASE_URL` is used by the running API. For a new migration during local development, make a schema change and run `npx prisma migrate dev --name <descriptive_name>` against the Supabase development project. Commit the resulting migration and use `npx prisma migrate deploy` in deployment. Do not point migration commands at production while iterating.
 
-The seed creates a demo agency, demo clients, calendar entries, and `admin@contentflow.local`. Its initial password is `ChangeMe123!`; change it immediately and do not use the demo seed in a production project. Seed execution is repeatable for the included demo records.
+The seed creates a demo agency, demo clients, calendar entries, and `admin@contentflow.local`. Set `DEMO_ADMIN_PASSWORD` to a unique password of at least 12 characters before running the seed. Do not use the demo seed in a production project. Seed execution is repeatable for the included demo records.
 
 ## 5. Run NestJS against Supabase
 
-Start the API with `npm run start:dev` or build and run with `npm run build && npm start`. `PrismaService` connects using the server-side `DATABASE_URL`. The API must run in a trusted server environment. Keep database URLs and `JWT_SECRET` in the hosting provider's secret manager, never in Next.js public environment variables, browser code, or client bundles.
+Start the API with `npm run start:dev` or build and run with `npm run build && npm start`. `PrismaService` connects using the server-side `DATABASE_URL`. The API must run in a trusted server environment. Keep database URLs and `JWT_ACCESS_SECRET` in the hosting provider's secret manager, never in Next.js public environment variables, browser code, or client bundles.
 
 ## 6. Database security
 
@@ -56,7 +56,7 @@ Public calendar sharing is served by the NestJS API and returns only approved or
 
 ## 7. Deploy the backend
 
-Deploy `apps/api` as a Node.js service. Configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `PORT`, and `WEB_ORIGIN` as server-side environment variables. Set the frontend's public API base URL to the deployed backend origin plus `/api`; localhost URLs only work for a browser on the developer's machine. Build with `npm ci && npx prisma generate && npm run build`. Run `npx prisma migrate deploy` as a release step before starting the new API version. Run `npx prisma db seed` only when demo data is intentionally wanted. Use HTTPS, rotate secrets through the hosting provider, and restrict production database access to the backend environment.
+Deploy `apps/api` as a Node.js service. Configure `DATABASE_URL`, `DIRECT_URL`, `JWT_ACCESS_SECRET`, `PORT`, and `WEB_ORIGIN` as server-side environment variables. Set the frontend's public API base URL to the deployed backend origin plus `/api`; localhost URLs only work for a browser on the developer's machine. Build with `npm ci && npx prisma generate && npm run build`. Run `npx prisma migrate deploy` as a release step before starting the new API version. Run `npx prisma db seed` only when demo data is intentionally wanted. Use HTTPS, rotate secrets through the hosting provider, and restrict production database access to the backend environment.
 
 ## Schema
 

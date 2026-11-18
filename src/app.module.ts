@@ -10,4 +10,12 @@ import { DashboardController } from './dashboard.controller';
 import { PublicController } from './public.controller';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-@Module({imports:[ConfigModule.forRoot({isGlobal:true})],controllers:[AuthController,ClientsController,ContentController,ShootsController,DashboardController,PublicController,NotificationsController],providers:[PrismaService,AuthService,NotificationsService]}) export class AppModule {}
+import { validateEnvironment } from './env.validation';
+
+@Module({
+  imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment })],
+  controllers: [AuthController, ClientsController, ContentController, ShootsController, DashboardController, PublicController, NotificationsController],
+  providers: [PrismaService, AuthService, NotificationsService],
+})
+export class AppModule {}
+
