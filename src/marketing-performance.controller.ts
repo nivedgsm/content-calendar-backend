@@ -47,12 +47,7 @@ export class MarketingPerformanceController {
     };
   }
 
-  @Get()
-  async list(
-    @CurrentUser() user: AuthUser,
-    @Query('clientId') clientId?: string,
-    @Query('month') month?: string,
-  ) {
+  private activityScope(user: AuthUser, month?: string, clientId?: string) {
     const where: Prisma.MarketingActivityWhereInput = {
       client: this.clientScope(user),
       ...(clientId && user.role !== 'CLIENT' ? { clientId } : {}),
@@ -71,11 +66,44 @@ export class MarketingPerformanceController {
       ];
     }
 
+    return where;
+  }
+
+  @Get()
+  async list(
+    @CurrentUser() user: AuthUser,
+    @Query('clientId') clientId?: string,
+    @Query('month') month?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (limit !== undefined && !/^(?:[1-9]|[1-4]\d|50)$/.test(limit)) {
+      throw new BadRequestException('Limit must be an integer from 1 to 50.');
+    }
     return this.db.marketingActivity.findMany({
-      where,
+      where: this.activityScope(user, month, clientId),
       include: activityInclude,
       orderBy: { uploadedAt: 'desc' },
+      take: limit === undefined ? undefined : Number(limit),
     });
+  }
+
+  @Get('summary')
+  async summary(@CurrentUser() user: AuthUser, @Query('month') month: string) {
+    if (!month) throw new BadRequestException('Month must use YYYY-MM format.');
+    const where = this.activityScope(user, month);
+    const now = new Date();
+    const [spend, activeCampaigns] = await Promise.all([
+      this.db.marketingActivity.aggregate({ where, _sum: { spendRupees: true } }),
+      this.db.marketingActivity.count({
+        where: {
+          AND: [where, {
+            uploadedAt: { lte: now },
+            OR: [{ takenDownAt: null }, { takenDownAt: { gt: now } }],
+          }],
+        },
+      }),
+    ]);
+    return { activeCampaigns, spendRupees: spend._sum.spendRupees ?? 0 };
   }
 
   @Post('upload')
