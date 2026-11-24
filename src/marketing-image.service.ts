@@ -1,5 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 type CloudinaryCredentials = {
   cloudName: string;
@@ -25,16 +25,16 @@ export class MarketingImageService {
     return createHash('sha1').update(signed + secret).digest('hex');
   }
 
-  async upload(buffer: Buffer, mimeType: string) {
+  async upload(buffer: Buffer, mimeType: string, agencyId: string) {
     const credentials = this.credentials();
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const folder = 'contentflow/marketing-performance';
-    const params = { folder, timestamp };
+    const publicId = `contentflow/marketing-performance/${agencyId}/${randomUUID()}`;
+    const params = { public_id: publicId, timestamp };
     const body = new FormData();
     const bytes = new Uint8Array(buffer);
     body.append('file', new Blob([bytes.buffer], { type: mimeType }), 'ad-creative');
     body.append('api_key', credentials.apiKey);
-    body.append('folder', folder);
+    body.append('public_id', publicId);
     body.append('timestamp', timestamp);
     body.append('signature', this.signature(params, credentials.apiSecret));
 

@@ -161,9 +161,16 @@ model MarketingActivity {
   platform       String   @default("META")
   uploadedAt     DateTime
   spendRupees    Decimal  @default(0) @db.Decimal(12, 2)
+  totalImpressions Int?
+  totalReach       Int?
+  totalResult      String?
+  costPerResult    Decimal? @db.Decimal(12, 2)
+  location        String?
+  showDailySpendToClient Boolean @default(true)
   takenDownAt    DateTime?
   imageUrl       String?
   imagePublicId  String?
+  images         MarketingActivityImage[]
   notes          String?
   client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
@@ -172,6 +179,19 @@ model MarketingActivity {
   @@index([clientId, uploadedAt])
   @@index([takenDownAt])
   @@map("marketing_activities")
+}
+
+model MarketingActivityImage {
+  id            String @id @default(cuid())
+  activityId    String
+  imageUrl      String
+  imagePublicId String?
+  createdAt     DateTime @default(now())
+  activity      MarketingActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@unique([activityId, imagePublicId])
+  @@map("marketing_activity_images")
 }
 
 model Approval {

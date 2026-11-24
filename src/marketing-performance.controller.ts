@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -24,10 +25,15 @@ import { MarketingImageService } from './marketing-image.service';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const activityInclude = {
+  client: { select: { id: true, name: true, color: true } },
+  images: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+} satisfies Prisma.MarketingActivityInclude;
 
 @UseGuards(JwtGuard)
 @Controller('marketing-performance')
 export class MarketingPerformanceController {
+  private readonly logger = new Logger(MarketingPerformanceController.name);
   constructor(private readonly db: PrismaService, private readonly images: MarketingImageService) {}
 
   private assertStaff(user: AuthUser): void {
@@ -67,7 +73,7 @@ export class MarketingPerformanceController {
 
     return this.db.marketingActivity.findMany({
       where,
-      include: { client: { select: { id: true, name: true, color: true } } },
+      include: activityInclude,
       orderBy: { uploadedAt: 'desc' },
     });
   }
@@ -91,7 +97,7 @@ export class MarketingPerformanceController {
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
       throw new ServiceUnavailableException('Image uploads are not configured for this API.');
     }
-    return this.images.upload(file.buffer, file.mimetype);
+    return this.images.upload(file.buffer, file.mimetype, user.agencyId);
   }
 
   @Post()
@@ -113,12 +119,19 @@ export class MarketingPerformanceController {
         platform: body.platform || 'META',
         uploadedAt: new Date(body.uploadedAt),
         spendRupees: new Prisma.Decimal(body.spendRupees),
+        totalImpressions: body.totalImpressions,
+        totalReach: body.totalReach,
+        totalResult: body.totalResult,
+        costPerResult: body.costPerResult,
+        location: body.location || null,
+        showDailySpendToClient: body.showDailySpendToClient,
         takenDownAt: body.takenDownAt ? new Date(body.takenDownAt) : null,
         imageUrl: body.imageUrl || null,
         imagePublicId: body.imagePublicId || null,
+        images: body.images?.length ? { createMany: { data: body.images, skipDuplicates: true } } : undefined,
         notes: body.notes || null,
       },
-      include: { client: { select: { id: true, name: true, color: true } } },
+      include: activityInclude,
     });
   }
 
@@ -160,24 +173,43 @@ export class MarketingPerformanceController {
         platform: body.platform,
         uploadedAt: body.uploadedAt ? nextUploadDate : undefined,
         spendRupees: body.spendRupees === undefined ? undefined : new Prisma.Decimal(body.spendRupees),
+        totalImpressions: body.totalImpressions,
+        totalReach: body.totalReach,
+        totalResult: body.totalResult,
+        costPerResult: body.costPerResult,
+        location: body.location === undefined ? undefined : body.location || null,
+        showDailySpendToClient: body.showDailySpendToClient,
         takenDownAt: body.takenDownAt === undefined ? undefined : nextTakenDownDate,
         imageUrl: body.imageUrl === undefined ? undefined : body.imageUrl || null,
         imagePublicId: body.imagePublicId === undefined ? undefined : body.imagePublicId || null,
+        images: body.images?.length ? { createMany: { data: body.images, skipDuplicates: true } } : undefined,
         notes: body.notes === undefined ? undefined : body.notes || null,
       },
-      include: { client: { select: { id: true, name: true, color: true } } },
+      include: activityInclude,
     });
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     this.assertStaff(user);
-    const activity = await this.db.marketingActivity.findFirst({
+    const activity = await this.db.marketingActivity.delete({
       where: { id, client: { agencyId: user.agencyId } },
+      include: { images: true },
+    }).catch(error => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new NotFoundException();
+      }
+      throw error;
     });
-    if (!activity) throw new NotFoundException();
-    if (activity.imagePublicId) await this.images.delete(activity.imagePublicId);
-    await this.db.marketingActivity.delete({ where: { id } });
+    const prefix = `contentflow/marketing-performance/${user.agencyId}/`;
+    const publicIds = new Set([
+      activity.imagePublicId,
+      ...activity.images.map(image => image.imagePublicId?.startsWith(prefix) ? image.imagePublicId : null),
+    ]);
+    for (const publicId of publicIds) {
+      if (!publicId) continue;
+      await this.images.delete(publicId).catch(() => this.logger.warn('Could not remove an image from storage.'));
+    }
     return { success: true };
   }
 }
