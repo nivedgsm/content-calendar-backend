@@ -128,6 +128,12 @@ export class MarketingPerformanceController {
     return this.images.upload(file.buffer, file.mimetype, user.agencyId);
   }
 
+  @Post('upload-signature')
+  signImageUpload(@CurrentUser() user: AuthUser) {
+    this.assertStaff(user);
+    return this.images.signUpload(user.agencyId);
+  }
+
   @Post()
   async create(@Body() body: CreateMarketingActivityDto, @CurrentUser() user: AuthUser) {
     this.assertStaff(user);
@@ -215,6 +221,52 @@ export class MarketingPerformanceController {
       },
       include: activityInclude,
     });
+  }
+
+  @Delete(':id/images/:imageId')
+  async removeImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    this.assertStaff(user);
+    const { activity, publicId } = await this.db.$transaction(async db => {
+      const where = { id, client: { agencyId: user.agencyId } };
+      const current = await db.marketingActivity.findFirst({ where, include: activityInclude });
+      if (!current) throw new NotFoundException();
+      const image = imageId === 'legacy'
+        ? { imageUrl: current.imageUrl, imagePublicId: current.imagePublicId }
+        : current.images.find(image => image.id === imageId);
+      if (!image?.imageUrl) return { activity: current, publicId: null };
+
+      await db.marketingActivityImage.deleteMany({
+        where: { activityId: id, imageUrl: image.imageUrl },
+      });
+      if (current.imageUrl === image.imageUrl) {
+        await db.marketingActivity.updateMany({
+          where: { ...where, imageUrl: image.imageUrl },
+          data: { imageUrl: null, imagePublicId: null },
+        });
+      }
+      return {
+        activity: await db.marketingActivity.findFirstOrThrow({ where, include: activityInclude }),
+        publicId: image.imagePublicId ?? current.images.find(row => row.imageUrl === image.imageUrl)?.imagePublicId,
+      };
+    });
+
+    if (publicId?.startsWith(`contentflow/marketing-performance/${user.agencyId}/`)) {
+      const remaining = await this.db.marketingActivity.findFirst({
+        where: {
+          client: { agencyId: user.agencyId },
+          OR: [{ imagePublicId: publicId }, { images: { some: { imagePublicId: publicId } } }],
+        },
+        select: { id: true },
+      });
+      if (!remaining) {
+        await this.images.delete(publicId).catch(() => this.logger.warn('Could not remove an image from storage.'));
+      }
+    }
+    return activity;
   }
 
   @Delete(':id')

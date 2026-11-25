@@ -25,6 +25,20 @@ export class MarketingImageService {
     return createHash('sha1').update(signed + secret).digest('hex');
   }
 
+  signUpload(agencyId: string) {
+    const { cloudName, apiKey, apiSecret } = this.credentials();
+    const params = {
+      allowed_formats: 'jpg,jpeg,png,webp,gif',
+      overwrite: 'false',
+      public_id: `contentflow/marketing-performance/${agencyId}/${randomUUID()}`,
+      timestamp: Math.floor(Date.now() / 1000).toString(),
+    };
+    return {
+      url: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      fields: { ...params, api_key: apiKey, signature: this.signature(params, apiSecret) },
+    };
+  }
+
   async upload(buffer: Buffer, mimeType: string, agencyId: string) {
     const credentials = this.credentials();
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -70,11 +84,12 @@ export class MarketingImageService {
   async delete(publicId: string): Promise<void> {
     const credentials = this.credentials();
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const params = { public_id: publicId, timestamp };
+    const params = { public_id: publicId, timestamp, invalidate: 'true' };
     const body = new FormData();
     body.append('api_key', credentials.apiKey);
     body.append('public_id', publicId);
     body.append('timestamp', timestamp);
+    body.append('invalidate', params.invalidate);
     body.append('signature', this.signature(params, credentials.apiSecret));
 
     let response: Response;

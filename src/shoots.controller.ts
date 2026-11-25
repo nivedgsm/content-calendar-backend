@@ -21,7 +21,7 @@ export class ShootsController {
     if (u.role === 'CLIENT') throw new ForbiddenException();
     const client = await this.db.client.findFirst({ where: { id: b.clientId, agencyId: u.agencyId }, select: { id: true } });
     if (!client) throw new NotFoundException('Client not found');
-    const shoot = await this.db.shoot.create({ data: { title: b.title, date: new Date(b.date), startTime: b.startTime, endTime: b.endTime, location: b.location, crew: b.crew, shotList: b.shotList, notes: b.notes, clientId: client.id } });
+    const shoot = await this.db.shoot.create({ data: { title: b.title, date: new Date(b.date), startTime: b.startTime || null, endTime: b.endTime || null, location: b.location, crew: b.crew, shotList: b.shotList, notes: b.notes, clientId: client.id } });
     await this.notifications.toClient(client.id, {
       type: 'SHOOT_SCHEDULED',
       title: 'New shoot scheduled',
@@ -36,7 +36,7 @@ export class ShootsController {
     if (u.role === 'CLIENT') throw new ForbiddenException();
     const s = await this.db.shoot.findFirst({ where: { id, client: { agencyId: u.agencyId } } });
     if (!s) throw new NotFoundException();
-    const shoot = await this.db.shoot.update({ where: { id }, data: { title: b.title, date: b.date ? new Date(b.date) : undefined, startTime: b.startTime, endTime: b.endTime, location: b.location, crew: b.crew, shotList: b.shotList, notes: b.notes } });
+    const shoot = await this.db.shoot.update({ where: { id }, data: { title: b.title, date: b.date ? new Date(b.date) : undefined, startTime: b.startTime === '' ? null : b.startTime, endTime: b.endTime === '' ? null : b.endTime, location: b.location, crew: b.crew, shotList: b.shotList, notes: b.notes } });
     await this.notifications.toClient(s.clientId, {
       type: 'SHOOT_UPDATED',
       title: 'Shoot schedule updated',
